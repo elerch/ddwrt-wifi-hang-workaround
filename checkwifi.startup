@@ -1,0 +1,46 @@
+# Acquired 2012-07-09 from http://www.dd-wrt.com/phpBB2/viewtopic.php?p=647529
+#! /bin/sh
+
+# Or just put it in the nvram startup
+#nvram set rc_startup='{The Rest of this script}'
+
+# set up variable to track waiting times
+restarted_wifi=false
+# Check interface every minute
+logger "Starting to check wifi status"
+while sleep 50; do
+  restarted_wifi=false
+  # Check for the most recent message of WiFi dropping out, 
+  # unsure if it is the same as the other hang below
+  test_time=`date  +"%b %e %H:%M" | cut -c1-11`
+  test_message=`grep "$test_time" /var/log/messages`
+  test_wifi_down=`echo $test_message | fgrep ff:ff:ff:ff:ff:ff`
+  test_beacon_issue=`echo $test_message | fgrep "Resetting; Code: 01"`
+  if [ "$test_wifi_down" != "" ];
+  # If found then restart the WiFi interface
+  then   logger "Wifi hang, restarting";
+   ifconfig ath0 down;
+        sleep 4;
+        ifconfig ath0 up;
+        restarted_wifi=true
+        test_wifi_down=""
+  # Check for the most recent message of WiFi hang, 
+  # unsure if it is the same as the dropping above
+  elif [ "$test_beacon_issue" != "" ];
+  # If found then restart the WiFi interface
+  then
+   logger "Wifi beacon issue, restarting";
+   ifconfig ath0 down;
+        sleep 4;
+        ifconfig ath0 up;
+        restarted_wifi=true
+        test_beacon_issue=""
+  fi;
+  # Wait a long while before we check again since we just restarted
+  if [ $restarted_wifi == "true" ]; then
+        logger "Will wait 542 seconds before checking wifi again";
+        sleep 542;
+        restarted_wifi=false;
+        logger "Will start to check wifi every 50 seconds again";
+  fi
+done
